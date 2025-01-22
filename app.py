@@ -17,7 +17,7 @@ os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 dataset_path = "datasets/cleaned_artifacts_with_descriptions.csv"
 features_path = "datasets/precomputed_features.npy"
 df = pd.read_csv(dataset_path)
-df.columns = df.columns.str.strip()
+df.columns = df.columns.str.strip()  # Clean column names
 precomputed_features = np.load(features_path)
 
 # Load TensorFlow Lite model
@@ -37,8 +37,8 @@ def preprocess_image(image_path):
             raise ValueError("Image not found or invalid file format.")
         img = cv2.resize(img, (224, 224))
         img_array = img_to_array(img)
-        img_array = np.expand_dims(img_array, axis=0)
-        return preprocess_input(img_array).astype(np.float32)
+        img_array = np.expand_dims(img_array, axis=0).astype(np.float32)
+        return preprocess_input(img_array)
     except Exception as e:
         print(f"Error preprocessing image: {e}")
         return None
@@ -49,7 +49,11 @@ def extract_features(image_path):
     if preprocessed_img is None:
         return None
 
-    # Run inference
+    # Adjust dimensions to match TensorFlow Lite model input
+    input_shape = input_details[0]['shape']
+    if preprocessed_img.shape != input_shape:
+        preprocessed_img = np.resize(preprocessed_img, input_shape)
+
     interpreter.set_tensor(input_details[0]['index'], preprocessed_img)
     interpreter.invoke()
     features = interpreter.get_tensor(output_details[0]['index'])
@@ -85,7 +89,7 @@ def check_authenticity(image_path, similarity_threshold=0.7):
 # Routes
 @app.route("/")
 def index():
-    return render_template("index.html")
+    return render_template("index.html")  # HTML file for uploading images
 
 @app.route("/upload", methods=["POST"])
 def upload():

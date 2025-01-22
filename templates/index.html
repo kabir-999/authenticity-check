@@ -7,41 +7,34 @@
     <style>
         body {
             font-family: Arial, sans-serif;
-            text-align: center;
-            margin: 20px;
-        }
-        h1 {
-            color: #0056b3;
-        }
-        form {
             margin: 20px;
             padding: 20px;
-            border: 1px solid #ccc;
-            border-radius: 8px;
-            display: inline-block;
-            background-color: #f9f9f9;
+            background-color: #f4f4f9;
         }
-        input[type="file"] {
-            margin-bottom: 20px;
+        h1 {
+            color: #333;
+        }
+        form {
+            margin-top: 20px;
         }
         button {
-            padding: 10px 20px;
-            background-color: #0056b3;
+            background-color: #4CAF50;
             color: white;
             border: none;
-            border-radius: 5px;
+            padding: 10px 20px;
             cursor: pointer;
+            border-radius: 5px;
         }
         button:hover {
-            background-color: #003d80;
+            background-color: #45a049;
         }
     </style>
 </head>
 <body>
-    <h1>Artifact Authenticity Checker</h1>
+    <h1>Upload an Artifact Image</h1>
     <form action="/upload" method="post" enctype="multipart/form-data">
         <input type="file" name="file" accept="image/*" required>
-        <button type="submit">Check Authenticity</button>
+        <button type="submit">Upload</button>
     </form>
 </body>
 </html>
