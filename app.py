@@ -16,12 +16,20 @@ os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 # Load dataset and precomputed features
 dataset_path = "datasets/cleaned_artifacts_with_descriptions.csv"
 features_path = "datasets/precomputed_features.npy"
+
+# Check if dataset and features exist
+if not os.path.exists(dataset_path) or not os.path.exists(features_path):
+    raise FileNotFoundError("Dataset or precomputed features not found.")
+
 df = pd.read_csv(dataset_path)
 df.columns = df.columns.str.strip()  # Clean column names
 precomputed_features = np.load(features_path)
 
 # Load TensorFlow Lite model
 lite_model_path = os.path.join(os.getcwd(), "models", "efficientnet_lite.tflite")
+if not os.path.exists(lite_model_path):
+    raise FileNotFoundError("TensorFlow Lite model file not found.")
+
 interpreter = tf.lite.Interpreter(model_path=lite_model_path)
 interpreter.allocate_tensors()
 
@@ -30,15 +38,26 @@ input_details = interpreter.get_input_details()
 output_details = interpreter.get_output_details()
 
 # Function to preprocess images
+# Function to preprocess images
 def preprocess_image(image_path):
     try:
         img = cv2.imread(image_path)
         if img is None:
             raise ValueError("Image not found or invalid file format.")
-        img = cv2.resize(img, (224, 224))
+        
+        # Get the expected input shape from the model
+        input_shape = input_details[0]['shape']
+        target_size = (input_shape[1], input_shape[2])  # Get width and height from model
+        
+        # Resize and preprocess image
+        img = cv2.resize(img, target_size)
         img_array = img_to_array(img)
         img_array = np.expand_dims(img_array, axis=0).astype(np.float32)
-        return preprocess_input(img_array)
+        
+        # Normalize the image
+        img_array = preprocess_input(img_array)
+        
+        return img_array
     except Exception as e:
         print(f"Error preprocessing image: {e}")
         return None
@@ -48,28 +67,27 @@ def extract_features(image_path):
     preprocessed_img = preprocess_image(image_path)
     if preprocessed_img is None:
         return None
-
-    # Adjust dimensions to match TensorFlow Lite model input
+    
+    # Check if dimensions match the model's input shape
     input_shape = input_details[0]['shape']
-    if preprocessed_img.shape != input_shape:
-        preprocessed_img = np.resize(preprocessed_img, input_shape)
+    if preprocessed_img.shape != tuple(input_shape):
+        print(f"Error: Input shape mismatch. Expected {tuple(input_shape)}, got {preprocessed_img.shape}.")
+        return None
 
+    # Run inference
     interpreter.set_tensor(input_details[0]['index'], preprocessed_img)
     interpreter.invoke()
     features = interpreter.get_tensor(output_details[0]['index'])
     return features.flatten()
-
 # Authenticity checking function
 def check_authenticity(image_path, similarity_threshold=0.7):
     image_features = extract_features(image_path)
     if image_features is None:
         return "<h1>Error: Unable to extract features from the image.</h1>"
-
     similarities = cosine_similarity([image_features], precomputed_features)[0]
     highest_similarity = max(similarities)
     closest_match_index = np.argmax(similarities)
     closest_match = df.iloc[closest_match_index]
-
     if highest_similarity >= similarity_threshold:
         return f"""
         <h1>Authentic Artifact</h1>
@@ -95,15 +113,11 @@ def index():
 def upload():
     if "file" not in request.files:
         return "<h1>Error: No file part in the request.</h1>", 400
-
     file = request.files["file"]
     if file.filename == "":
         return "<h1>Error: No file selected for upload.</h1>", 400
-
     file_path = os.path.join(app.config["UPLOAD_FOLDER"], file.filename)
     file.save(file_path)
-
-    # Check authenticity
     result = check_authenticity(file_path)
     return result
 
