@@ -21,7 +21,7 @@ df.columns = df.columns.str.strip()
 precomputed_features = np.load(features_path)
 
 # Load TensorFlow Lite model
-lite_model_path = "models/efficientnet_lite.tflite"
+lite_model_path = "D:\auth\model\efficientnet_lite.tflite"
 interpreter = tf.lite.Interpreter(model_path=lite_model_path)
 interpreter.allocate_tensors()
 
