@@ -14,14 +14,14 @@ app.config["UPLOAD_FOLDER"] = "./uploads"
 os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 
 # Load dataset and precomputed features
-dataset_path = "datasets/cleaned_artifacts_with_descriptions.csv"  # Update with your dataset path
-features_path = "datasets/precomputed_features.npy"  # Update with your features path
+dataset_path = "datasets/cleaned_artifacts_with_descriptions.csv"
+features_path = "datasets/precomputed_features.npy"
 df = pd.read_csv(dataset_path)
-df.columns = df.columns.str.strip()  # Clean column names
+df.columns = df.columns.str.strip()
 precomputed_features = np.load(features_path)
 
-# Load TensorFlow Lite model (EfficientNet Lite or Quantized Model)
-lite_model_path = "models/efficientnet_lite.tflite"  # Path to your TensorFlow Lite model
+# Load TensorFlow Lite model
+lite_model_path = "models/efficientnet_lite.tflite"
 interpreter = tf.lite.Interpreter(model_path=lite_model_path)
 interpreter.allocate_tensors()
 
@@ -38,7 +38,7 @@ def preprocess_image(image_path):
         img = cv2.resize(img, (224, 224))
         img_array = img_to_array(img)
         img_array = np.expand_dims(img_array, axis=0)
-        return preprocess_input(img_array).astype(np.float32)  # TensorFlow Lite requires float32
+        return preprocess_input(img_array).astype(np.float32)
     except Exception as e:
         print(f"Error preprocessing image: {e}")
         return None
@@ -85,7 +85,7 @@ def check_authenticity(image_path, similarity_threshold=0.7):
 # Routes
 @app.route("/")
 def index():
-    return render_template("index.html")  # HTML file for uploading images
+    return render_template("index.html")
 
 @app.route("/upload", methods=["POST"])
 def upload():
