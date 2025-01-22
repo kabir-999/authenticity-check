@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import cv2
 from flask import Flask, request, render_template
-from tensorflow.keras.applications import EfficientNetB0
+import tensorflow as tf
 from tensorflow.keras.applications.efficientnet import preprocess_input
 from tensorflow.keras.preprocessing.image import img_to_array
 from sklearn.metrics.pairwise import cosine_similarity
@@ -20,8 +20,14 @@ df = pd.read_csv(dataset_path)
 df.columns = df.columns.str.strip()  # Clean column names
 precomputed_features = np.load(features_path)
 
-# Load pre-trained EfficientNetB0 model
-model = EfficientNetB0(weights="imagenet", include_top=False, pooling="avg")
+# Load TensorFlow Lite model (EfficientNet Lite or Quantized Model)
+lite_model_path = "models/efficientnet_lite.tflite"  # Path to your TensorFlow Lite model
+interpreter = tf.lite.Interpreter(model_path=lite_model_path)
+interpreter.allocate_tensors()
+
+# Get input and output details
+input_details = interpreter.get_input_details()
+output_details = interpreter.get_output_details()
 
 # Function to preprocess images
 def preprocess_image(image_path):
@@ -32,23 +38,28 @@ def preprocess_image(image_path):
         img = cv2.resize(img, (224, 224))
         img_array = img_to_array(img)
         img_array = np.expand_dims(img_array, axis=0)
-        return preprocess_input(img_array)
+        return preprocess_input(img_array).astype(np.float32)  # TensorFlow Lite requires float32
     except Exception as e:
         print(f"Error preprocessing image: {e}")
         return None
 
-# Function to extract features
+# Function to extract features using TensorFlow Lite model
 def extract_features(image_path):
     preprocessed_img = preprocess_image(image_path)
     if preprocessed_img is None:
         return None
-    return model.predict(preprocessed_img).flatten()
+
+    # Run inference
+    interpreter.set_tensor(input_details[0]['index'], preprocessed_img)
+    interpreter.invoke()
+    features = interpreter.get_tensor(output_details[0]['index'])
+    return features.flatten()
 
 # Authenticity checking function
 def check_authenticity(image_path, similarity_threshold=0.7):
     image_features = extract_features(image_path)
     if image_features is None:
-        return "Error: Unable to extract features from the image."
+        return "<h1>Error: Unable to extract features from the image.</h1>"
 
     similarities = cosine_similarity([image_features], precomputed_features)[0]
     highest_similarity = max(similarities)
