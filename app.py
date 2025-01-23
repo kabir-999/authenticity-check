@@ -2,7 +2,8 @@ import os
 import numpy as np
 import pandas as pd
 import cv2
-from flask import Flask, request, render_template
+from flask import Flask, request, render_template, jsonify
+from flask_cors import CORS
 import tensorflow as tf
 from tensorflow.keras.applications.efficientnet import preprocess_input
 from tensorflow.keras.preprocessing.image import img_to_array
@@ -10,6 +11,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 
 # Flask app
 app = Flask(__name__)
+CORS(app)  # Enable CORS for all routes
 app.config["UPLOAD_FOLDER"] = "./uploads"
 os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 
@@ -37,7 +39,6 @@ interpreter.allocate_tensors()
 input_details = interpreter.get_input_details()
 output_details = interpreter.get_output_details()
 
-# Function to preprocess images
 # Function to preprocess images
 def preprocess_image(image_path):
     try:
@@ -79,30 +80,29 @@ def extract_features(image_path):
     interpreter.invoke()
     features = interpreter.get_tensor(output_details[0]['index'])
     return features.flatten()
+
 # Authenticity checking function
 def check_authenticity(image_path, similarity_threshold=0.7):
     image_features = extract_features(image_path)
     if image_features is None:
-        return "<h1>Error: Unable to extract features from the image.</h1>"
+        return {"status": "Error", "message": "Unable to extract features from the image."}
+    
     similarities = cosine_similarity([image_features], precomputed_features)[0]
-    highest_similarity = max(similarities)
+    highest_similarity = float(max(similarities))  # Convert to Python float for JSON compatibility
     closest_match_index = np.argmax(similarities)
     closest_match = df.iloc[closest_match_index]
+
     if highest_similarity >= similarity_threshold:
-        return f"""
-        <h1>Authentic Artifact</h1>
-        <p><strong>Closest Match:</strong> {closest_match['Artifact Name']}</p>
-        <p><strong>Date:</strong> {closest_match['Date']}</p>
-        <p><strong>Culture/Region:</strong> {closest_match['Culture/Region']}</p>
-        <p><strong>Material:</strong> {closest_match['Material']}</p>
-        <p><strong>Dimensions:</strong> {closest_match['Dimensions']}</p>
-        <p><strong>Category/Type:</strong> {closest_match['Category/Type']}</p>
-        <p><strong>Description:</strong> {closest_match['Description']}</p>
-        <p><strong>Similarity:</strong> {highest_similarity:.2f}</p>
-        <img src="{closest_match['Artifact Image URL']}" alt="Artifact Image" style="max-width: 100%; height: auto;">
-        """
+        return {
+            "status": "Authentic",
+            "similarity": highest_similarity,
+            "artifact_details": closest_match.to_dict()
+        }
     else:
-        return f"<h1>Counterfeit Artifact</h1><p>Similarity: {highest_similarity:.2f}</p>"
+        return {
+            "status": "Counterfeit",
+            "similarity": highest_similarity,
+        }
 
 # Routes
 @app.route("/")
@@ -112,14 +112,18 @@ def index():
 @app.route("/upload", methods=["POST"])
 def upload():
     if "file" not in request.files:
-        return "<h1>Error: No file part in the request.</h1>", 400
+        return jsonify({"error": "No file part in the request."}), 400
+    
     file = request.files["file"]
     if file.filename == "":
-        return "<h1>Error: No file selected for upload.</h1>", 400
+        return jsonify({"error": "No file selected for upload."}), 400
+
     file_path = os.path.join(app.config["UPLOAD_FOLDER"], file.filename)
     file.save(file_path)
+
+    # Check authenticity
     result = check_authenticity(file_path)
-    return result
+    return jsonify(result)  # Return JSON response
 
 # Run the app
 if __name__ == "__main__":
