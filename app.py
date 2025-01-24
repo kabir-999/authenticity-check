@@ -99,10 +99,7 @@ def check_authenticity(image_path, similarity_threshold=0.7):
             "artifact_details": closest_match.to_dict()
         }
     else:
-        return {
-            "status": "Counterfeit",
-            "similarity": highest_similarity,
-        }
+        return artifact_details
 
 # Routes
 @app.route("/")
